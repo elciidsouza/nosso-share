@@ -6,6 +6,7 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   VideoConference,
+  useLocalParticipant
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 
@@ -24,6 +25,35 @@ if (discordClientId) {
     patchFetch: true,
     patchXhr: true
   });
+}
+
+function CustomControls({ addLog }: { addLog: (msg: string) => void }) {
+  const { localParticipant } = useLocalParticipant();
+
+  async function startScreenShare() {
+    try {
+      addLog("Tentando capturar tela...");
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        addLog("Navegador/Discord bloqueou o getDisplayMedia!");
+        return;
+      }
+      await localParticipant.setScreenShareEnabled(true);
+      addLog("Tela compartilhada com sucesso!");
+    } catch (e: any) {
+      addLog(`Erro ScreenShare: ${e.message || e}`);
+    }
+  }
+
+  return (
+    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 flex gap-4">
+      <button 
+        onClick={startScreenShare}
+        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all"
+      >
+        💻 Forçar Compartilhamento de Tela
+      </button>
+    </div>
+  );
 }
 
 export default function Page() {
@@ -111,6 +141,7 @@ export default function Page() {
         onError={(err) => addLog(`LiveKit Error: ${err?.message}`)}
       >
         <VideoConference />
+        <CustomControls addLog={addLog} />
         <RoomAudioRenderer />
       </LiveKitRoom>
     </div>
