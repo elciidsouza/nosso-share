@@ -15,14 +15,12 @@ let discordSdk: DiscordSDK | null = null;
 if (discordClientId) {
   discordSdk = new DiscordSDK(discordClientId);
   
-  // Extrai só o domínio do URL do LiveKit (sem wss://)
-  const livekitDomain = process.env.NEXT_PUBLIC_LIVEKIT_URL?.replace("wss://", "") || "";
-  
   // Força o Discord a permitir a conexão de WebSocket externa!
+  // O target precisa ter o wss:// para o interceptador do Discord reconhecer!
   patchUrlMappings([
     {
       prefix: '/livekit',
-      target: livekitDomain
+      target: process.env.NEXT_PUBLIC_LIVEKIT_URL || ""
     }
   ], {
     patchWebSocket: true
