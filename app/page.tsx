@@ -6,7 +6,8 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   VideoConference,
-  useLocalParticipant
+  useLocalParticipant,
+  ControlBar
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 
@@ -15,9 +16,7 @@ let discordSdk: DiscordSDK | null = null;
 
 if (discordClientId) {
   discordSdk = new DiscordSDK(discordClientId);
-  
   const livekitDomain = process.env.NEXT_PUBLIC_LIVEKIT_URL?.replace("wss://", "").replace("https://", "") || "";
-  
   patchUrlMappings([
     { prefix: '/livekit', target: livekitDomain }
   ], {
@@ -27,30 +26,24 @@ if (discordClientId) {
   });
 }
 
-function CustomControls({ addLog }: { addLog: (msg: string) => void }) {
-  const { localParticipant } = useLocalParticipant();
+// Botão que aparece no Discord para o streamer abrir no Chrome
+function HostControls({ roomId }: { roomId: string }) {
+  const [copied, setCopied] = useState(false);
 
-  async function startScreenShare() {
-    try {
-      addLog("Tentando capturar tela...");
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        addLog("Navegador/Discord bloqueou o getDisplayMedia!");
-        return;
-      }
-      await localParticipant.setScreenShareEnabled(true);
-      addLog("Tela compartilhada com sucesso!");
-    } catch (e: any) {
-      addLog(`Erro ScreenShare: ${e.message || e}`);
-    }
+  function copyLink() {
+    const url = `https://nosso-share.vercel.app/?room=${roomId}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
   }
 
   return (
-    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 flex gap-4">
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 flex gap-4">
       <button 
-        onClick={startScreenShare}
-        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all"
+        onClick={copyLink}
+        className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all border-2 border-purple-400"
       >
-        💻 Forçar Compartilhamento de Tela
+        {copied ? "✅ Link copiado!" : "📡 Compartilhar Tela (Abre no Navegador)"}
       </button>
     </div>
   );
@@ -59,75 +52,69 @@ function CustomControls({ addLog }: { addLog: (msg: string) => void }) {
 export default function Page() {
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
-  const [logs, setLogs] = useState<string[]>(["Iniciando..."]);
-
-  function addLog(msg: string) {
-    setLogs((prev) => [...prev, msg]);
-  }
+  const [isBrowserMode, setIsBrowserMode] = useState(false);
+  const [activeRoomId, setActiveRoomId] = useState("");
 
   useEffect(() => {
-    window.onerror = (msg) => addLog(`Browser Error: ${msg}`);
-    window.onunhandledrejection = (e) => addLog(`Promise Rej: ${e.reason}`);
+    // Verifica se tem '?room=' na URL (modo navegador)
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get("room");
 
+    if (roomParam) {
+      setIsBrowserMode(true);
+      setActiveRoomId(roomParam);
+      joinRoom(roomParam, "Streamer-" + Math.floor(Math.random() * 1000));
+      return;
+    }
+
+    // Modo Discord (iframe)
     async function setupDiscord() {
-      addLog("Lendo SDK do Discord...");
-      if (!discordSdk) {
-        setError("O Client ID do Discord não foi configurado (.env).");
-        return;
-      }
+      if (!discordSdk) return setError("Client ID não configurado.");
+      
       try {
-        addLog("Aguardando ready() do Discord...");
         await discordSdk.ready();
-        addLog(`Discord ready! Canal: ${discordSdk.channelId}`);
-        
         const channelId = discordSdk.channelId || "sala-de-teste";
-        const username = "Membro-" + Math.floor(Math.random() * 10000);
-
-        addLog(`Buscando token (/api/token?room=${channelId})...`);
-        const res = await fetch(`/api/token?room=${channelId}&username=${username}`);
-        const data = await res.json();
-        
-        if (data.token) {
-          addLog("Token recebido com sucesso!");
-          addLog(`URL do LiveKit: ${process.env.NEXT_PUBLIC_LIVEKIT_URL}`);
-          setToken(data.token);
-        } else {
-          addLog(`Erro API: ${data.error}`);
-          setError(data.error || "Falha ao pegar token");
-        }
+        setActiveRoomId(channelId);
+        joinRoom(channelId, "Espectador-" + Math.floor(Math.random() * 1000));
       } catch (err: any) {
-        addLog(`CATCH Error: ${err.message || err}`);
-        console.error(err);
-        setError("Erro ao conectar com o Discord.");
+        setError("Abra isso pelo Discord, ou use o link de Streamer no navegador!");
       }
     }
     setupDiscord();
   }, []);
 
+  async function joinRoom(room: string, username: string) {
+    try {
+      const res = await fetch(`/api/token?room=${room}&username=${username}`);
+      const data = await res.json();
+      if (data.token) {
+        setToken(data.token);
+      } else {
+        setError(data.error || "Falha ao pegar token");
+      }
+    } catch (err: any) {
+      setError("Falha de rede ao buscar token");
+    }
+  }
+
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black text-red-500 font-bold p-4 text-center flex-col">
+      <div className="flex items-center justify-center min-h-screen bg-black text-red-500 font-bold p-4 text-center">
         <p>{error}</p>
-        <pre className="text-left text-xs mt-4 text-gray-400">{logs.join("\n")}</pre>
       </div>
     );
   }
 
   if (token === "") {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black text-white font-bold flex-col">
-        <p>Conectando na sala...</p>
-        <pre className="text-left text-xs mt-4 text-gray-400 w-full p-4">{logs.join("\n")}</pre>
+      <div className="flex items-center justify-center min-h-screen bg-black text-white font-bold">
+        <p>Conectando na sala de vídeo...</p>
       </div>
     );
   }
 
   return (
     <div className="h-screen w-screen bg-black overflow-hidden relative">
-      <div className="absolute top-0 left-0 z-50 p-2 bg-black/80 text-green-400 text-xs w-full max-h-40 overflow-y-auto">
-        {logs.map((l, i) => <div key={i}>{l}</div>)}
-      </div>
-
       <LiveKitRoom
         video={false}
         audio={false}
@@ -136,13 +123,19 @@ export default function Page() {
         connect={true}
         data-lk-theme="default"
         style={{ height: "100vh", width: "100vw" }}
-        onConnected={() => addLog("LiveKitRoom disparou: onConnected!")}
-        onDisconnected={() => addLog("LiveKitRoom disparou: onDisconnected (conexão caiu ou falhou)")}
-        onError={(err) => addLog(`LiveKit Error: ${err?.message}`)}
       >
         <VideoConference />
-        <CustomControls addLog={addLog} />
         <RoomAudioRenderer />
+        
+        {/* Se estiver no Discord, mostra o botão para copiar o link. 
+            Se estiver no Chrome, mostra a barra de controles padrão do LiveKit para ligar a tela! */}
+        {!isBrowserMode ? (
+          <HostControls roomId={activeRoomId} />
+        ) : (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50">
+            <ControlBar controls={{ microphone: true, camera: true, screenShare: true }} />
+          </div>
+        )}
       </LiveKitRoom>
     </div>
   );
