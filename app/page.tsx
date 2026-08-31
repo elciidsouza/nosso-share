@@ -15,15 +15,16 @@ let discordSdk: DiscordSDK | null = null;
 if (discordClientId) {
   discordSdk = new DiscordSDK(discordClientId);
   
-  // Força o Discord a permitir a conexão de WebSocket externa!
-  // O target precisa ter o wss:// para o interceptador do Discord reconhecer!
+  const livekitDomain = process.env.NEXT_PUBLIC_LIVEKIT_URL?.replace("wss://", "") || "";
+  
+  // O LiveKit faz requisições HTTP (fetch) antes do WebSocket! 
+  // Precisamos interceptar os dois.
   patchUrlMappings([
-    {
-      prefix: '/livekit',
-      target: process.env.NEXT_PUBLIC_LIVEKIT_URL || ""
-    }
+    { prefix: '/livekit', target: `wss://${livekitDomain}` },
+    { prefix: '/livekit', target: `https://${livekitDomain}` }
   ], {
-    patchWebSocket: true
+    patchWebSocket: true,
+    patchFetch: true
   });
 }
 
@@ -95,7 +96,7 @@ export default function Page() {
 
   return (
     <div className="h-screen w-screen bg-black overflow-hidden relative">
-      <div className="absolute top-0 left-0 z-50 p-2 bg-black/80 text-green-400 text-xs w-full max-h-40 overflow-y-auto pointer-events-none">
+      <div className="absolute top-0 left-0 z-50 p-2 bg-black/80 text-green-400 text-xs w-full max-h-40 overflow-y-auto">
         {logs.map((l, i) => <div key={i}>{l}</div>)}
       </div>
 
