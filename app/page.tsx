@@ -15,16 +15,14 @@ let discordSdk: DiscordSDK | null = null;
 if (discordClientId) {
   discordSdk = new DiscordSDK(discordClientId);
   
-  const livekitDomain = process.env.NEXT_PUBLIC_LIVEKIT_URL?.replace("wss://", "") || "";
+  const livekitDomain = process.env.NEXT_PUBLIC_LIVEKIT_URL?.replace("wss://", "").replace("https://", "") || "";
   
-  // O LiveKit faz requisições HTTP (fetch) antes do WebSocket! 
-  // Precisamos interceptar os dois.
   patchUrlMappings([
-    { prefix: '/livekit', target: `wss://${livekitDomain}` },
-    { prefix: '/livekit', target: `https://${livekitDomain}` }
+    { prefix: '/livekit', target: livekitDomain }
   ], {
     patchWebSocket: true,
-    patchFetch: true
+    patchFetch: true,
+    patchXhr: true
   });
 }
 
