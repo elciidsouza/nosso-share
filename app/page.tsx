@@ -74,6 +74,7 @@ export default function Page() {
         audio={false}
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
+        connect={true}
         data-lk-theme="default"
         style={{ height: "100vh", width: "100vw" }}
       >
