@@ -28,22 +28,23 @@ if (discordClientId) {
 
 // Botão que aparece no Discord para o streamer abrir no Chrome
 function HostControls({ roomId }: { roomId: string }) {
-  const [copied, setCopied] = useState(false);
-
-  function copyLink() {
+  function openBrowser() {
     const url = `https://nosso-share.vercel.app/?room=${roomId}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 3000);
+    if (discordSdk) {
+      // Força o Discord a abrir o navegador padrão do PC!
+      discordSdk.commands.openExternalLink({ url });
+    } else {
+      window.open(url, "_blank");
+    }
   }
 
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 flex gap-4">
       <button 
-        onClick={copyLink}
+        onClick={openBrowser}
         className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all border-2 border-purple-400"
       >
-        {copied ? "✅ Link copiado!" : "📡 Compartilhar Tela (Abre no Navegador)"}
+        📡 Compartilhar Tela (Abre no Navegador)
       </button>
     </div>
   );
