@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DiscordSDK } from "@discord/embedded-app-sdk";
+import { DiscordSDK, patchUrlMappings } from "@discord/embedded-app-sdk";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -14,6 +14,19 @@ let discordSdk: DiscordSDK | null = null;
 
 if (discordClientId) {
   discordSdk = new DiscordSDK(discordClientId);
+  
+  // Extrai só o domínio do URL do LiveKit (sem wss://)
+  const livekitDomain = process.env.NEXT_PUBLIC_LIVEKIT_URL?.replace("wss://", "") || "";
+  
+  // Força o Discord a permitir a conexão de WebSocket externa!
+  patchUrlMappings([
+    {
+      prefix: '/livekit',
+      target: livekitDomain
+    }
+  ], {
+    patchWebSocket: true
+  });
 }
 
 export default function Page() {
